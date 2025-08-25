@@ -15,6 +15,7 @@ from buildbase import (
     WebrtcInfo,
     add_path,
     add_webrtc_build_arguments,
+    apply_patch,
     build_and_install_boost,
     build_webrtc,
     cd,
@@ -197,6 +198,8 @@ def _build(
     if not os.path.exists(quiche_source_dir):
         logging.info("Cloning quiche...")
         git_clone_shallow(url="https://quiche.googlesource.com/quiche", hash=deps["QUICHE_VERSION"], dir=quiche_source_dir)
+        apply_patch(os.path.join(BASE_DIR, "quiche.patch"), quiche_source_dir, 1)
+
 
     with cd(quiche_source_dir):
         if not debug:
