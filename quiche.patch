@@ -1,8 +1,8 @@
 diff --git a/quiche/BUILD.bazel b/quiche/BUILD.bazel
-index 718fcda..fa7ff30 100644
+index 718fcda..7b4e30a 100644
 --- a/quiche/BUILD.bazel
 +++ b/quiche/BUILD.bazel
-@@ -565,3 +565,35 @@ alias(
+@@ -565,3 +565,49 @@ alias(
      actual = ":quiche_test_support",
      visibility = ["//visibility:public"],
  )
@@ -28,7 +28,21 @@ index 718fcda..fa7ff30 100644
 +    ],
 +    deps = [
 +        ":quiche_core",
++        "@com_google_absl//absl/algorithm:container",
++        "@com_google_absl//absl/base",
++        "@com_google_absl//absl/base:core_headers",
++        "@com_google_absl//absl/cleanup",
++        "@com_google_absl//absl/container:btree",
++        "@com_google_absl//absl/container:fixed_array",
++        "@com_google_absl//absl/container:flat_hash_map",
++        "@com_google_absl//absl/container:flat_hash_set",
++        "@com_google_absl//absl/container:node_hash_map",
 +        "@com_google_absl//absl/functional:bind_front",
++        "@com_google_absl//absl/memory",
++        "@com_google_absl//absl/status",
++        "@com_google_absl//absl/status:statusor",
++        "@com_google_absl//absl/strings",
++        "@com_google_absl//absl/types:span",
 +    ],
 +)
 +

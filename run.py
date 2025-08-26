@@ -96,7 +96,20 @@ def install_deps(
     with cd(BASE_DIR):
         deps = read_version_file("DEPS")
 
-    install_bazelisk(version=deps["BAZELISK_VERSION"], version_file=os.path.join(install_dir, "bazelisk.version"), install_dir=install_dir, platform="linux-amd64")
+    if platform.build.package_name == "windows_x86_64":
+        bazelisk_platform = "windows-amd64"
+    elif platform.build.package_name == "windows_arm64":
+        bazelisk_platform = "windows-arm64"
+    elif platform.build.package_name in ("macos_x86_64", "macos_arm64"):
+        bazelisk_platform = "darwin"
+    elif platform.build.package_name == "ubuntu-24.04_x86_64":
+        bazelisk_platform = "linux-amd64"
+    elif platform.build.package_name == "ubuntu-24.04_armv8":
+        bazelisk_platform = "linux-arm64"
+    else:
+        raise Exception(f"Unsupported platform for bazelisk: {platform.build.package_name}")
+
+    install_bazelisk(version=deps["BAZELISK_VERSION"], version_file=os.path.join(install_dir, "bazelisk.version"), install_dir=install_dir, platform=bazelisk_platform)
     add_path(os.path.join(install_dir, "bazelisk"))
 
 
@@ -242,6 +255,22 @@ def _package(target: str, debug: bool):
         )
 
 
+def _test(target: str, debug: bool):
+    platform = _get_platform(target)
+    configuration = "debug" if debug else "release"
+    cmake_configuration = "Debug" if debug else "Release"
+    build_dir = os.path.join(BASE_DIR, "_build", platform.target.package_name, configuration)
+    package_dir = os.path.join(BASE_DIR, "_package", platform.target.package_name, configuration)
+    args = [
+        f"-DCMAKE_BUILD_TYPE={cmake_configuration}",
+        f"-DMOQT_ROOT={cmake_path(os.path.join(package_dir, 'moqt'))}",
+    ]
+    cmd(["cmake", "-B", os.path.join(build_dir, "test"), "-S", os.path.join(BASE_DIR, "test"), *args])
+    cmd(["cmake", "--build", os.path.join(build_dir, "test"), "--config", cmake_configuration])
+    ext = ".exe" if platform.build.os == "windows" else ""
+    cmd([os.path.join(build_dir, "test", f"moqt_test{ext}")])
+
+
 def main():
     parser = argparse.ArgumentParser()
     subparser = parser.add_subparsers(dest="command",  help="利用可能なコマンド", required=True)
@@ -251,6 +280,9 @@ def main():
     sp = subparser.add_parser("package")
     sp.add_argument("target", choices=AVAILABLE_TARGETS)
     sp.add_argument("--debug", action="store_true")
+    tp = subparser.add_parser("test")
+    tp.add_argument("target", choices=AVAILABLE_TARGETS)
+    tp.add_argument("--debug", action="store_true")
 
     args = parser.parse_args()
 
@@ -259,8 +291,13 @@ def main():
             target=args.target,
             debug=args.debug,
         )
-    if args.command == "package":
+    elif args.command == "package":
         _package(
+            target=args.target,
+            debug=args.debug,
+        )
+    elif args.command == "test":
+        _test(
             target=args.target,
             debug=args.debug,
         )

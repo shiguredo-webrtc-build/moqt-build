@@ -1179,10 +1179,13 @@ def install_cmake(version, source_dir, install_dir, platform: str, ext):
 
 @versioned
 def install_bazelisk(version, install_dir, platform: str):
-    url = f"https://github.com/bazelbuild/bazelisk/releases/download/{version}/bazelisk-{platform}"
+    is_win = platform.find("windows") != -1
+    ext = ".exe" if is_win else ""
+    url = f"https://github.com/bazelbuild/bazelisk/releases/download/{version}/bazelisk-{platform}{ext}"
     mkdir_p(os.path.join(install_dir, "bazelisk"))
-    download(url, os.path.join(install_dir, "bazelisk"), filename="bazelisk")
-    cmd(["chmod", "+x", os.path.join(install_dir, "bazelisk", "bazelisk")])
+    download(url, os.path.join(install_dir, "bazelisk"), filename=f"bazelisk{ext}")
+    if not is_win:
+        cmd(["chmod", "+x", os.path.join(install_dir, "bazelisk", "bazelisk")])
 
 
 @versioned
