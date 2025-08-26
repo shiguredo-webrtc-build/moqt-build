@@ -1,0 +1,31 @@
+name: build
+on:
+  push:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "NOTICE"
+      - ".gitignore"
+jobs:
+  build-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows_x86_64
+            runs-on: windows-2022
+          - target: macos_arm64
+            runs-on: macos-15
+          - target: ubuntu-24.04_x86_64
+            runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 run.py build ${{ matrix.target }}
+      - run: python3 run.py package ${{ matrix.target }}
+      - run: python3 run.py test ${{ matrix.target }}
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: moqt-${{ matrix.platform.name }}
+          path: _package/${{ matrix.platform.name }}/release/moqt
