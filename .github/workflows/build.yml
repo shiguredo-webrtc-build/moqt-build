@@ -24,12 +24,17 @@ jobs:
       - run: python3 run.py build ${{ matrix.target }}
       - run: python3 run.py package ${{ matrix.target }}
       - run: python3 run.py test ${{ matrix.target }}
+      - name: Create Archive
+        run: |
+          cd _package/${{ matrix.target }}/release
+          tar czvf moqt.tar.gz -C . moqt
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: moqt-${{ matrix.target }}
-          path: _package/${{ matrix.target }}/release/moqt
-  create-package:
+          path: _package/${{ matrix.target }}/release/moqt-${{ matrix.target }}.tar.gz
+  create-release:
+    if: contains(github.ref, 'tags/20')
     needs:
       - build
     runs-on: ubuntu-24.04
@@ -41,12 +46,13 @@ jobs:
           path: moqt
           pattern: moqt-*
           merge-multiple: true
-      - name: Check Archive
-        run: find moqt
-      - name: Create Archive
-        run: tar czf moqt.tar.gz -C moqt .
-      - name: Upload Package
-        uses: actions/upload-artifact@v4
-        with:
-          name: moqt
-          path: moqt.tar.gz
+      - name: List Files
+        run: ls -R moqt
+      - name: Release
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --prerelease \
+            --title "${{ github.ref_name }}" \
+            moqt/*.tar.gz
+        env:
+          GH_TOKEN: ${{ github.token }}
