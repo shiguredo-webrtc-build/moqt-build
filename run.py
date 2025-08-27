@@ -285,7 +285,6 @@ def _build(
                 "--cxxopt=/DWIN32_LEAN_AND_MEAN",
                 # wingdi.h の ERROR マクロのせいでビルドが通らないので NOGDI を定義して除外する
                 "--cxxopt=/DNOGDI",
-                "-s",
             ]
 
         cmd(["bazelisk", *bazel_args])
