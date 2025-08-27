@@ -353,7 +353,7 @@ def _test(target: str, debug: bool):
     cmd(["cmake", "-B", os.path.join(build_dir, "test"), "-S", os.path.join(BASE_DIR, "test"), *args])
     cmd(["cmake", "--build", os.path.join(build_dir, "test"), "--config", cmake_configuration])
     if platform.build.os == "windows":
-        cmd([os.path.join(build_dir, "test", cmake_configuration, "moqt_test")])
+        cmd([os.path.join(build_dir, "test", cmake_configuration, "moqt_test.exe")])
     else:
         cmd([os.path.join(build_dir, "test", "moqt_test")])
 

@@ -7,7 +7,7 @@ on:
       - "NOTICE"
       - ".gitignore"
 jobs:
-  build-windows:
+  build:
     strategy:
       fail-fast: false
       matrix:
@@ -27,5 +27,26 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: moqt-${{ matrix.platform.name }}
-          path: _package/${{ matrix.platform.name }}/release/moqt
+          name: moqt-${{ matrix.target }}
+          path: _package/${{ matrix.target }}/release/moqt
+  create-package:
+    needs:
+      - build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: moqt
+          pattern: moqt-*
+          merge-multiple: true
+      - name: Check Archive
+        run: find moqt
+      - name: Create Archive
+        run: tar czf moqt.tar.gz -C moqt .
+      - name: Upload Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: moqt
+          path: moqt.tar.gz
