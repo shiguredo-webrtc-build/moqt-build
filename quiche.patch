@@ -71,10 +71,10 @@ index 718fcda..7b4e30a 100644
 +)
 diff --git a/quiche/cc_static_library.bzl b/quiche/cc_static_library.bzl
 new file mode 100644
-index 0000000..99b70ce
+index 0000000..03a49a5
 --- /dev/null
 +++ b/quiche/cc_static_library.bzl
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,64 @@
 +load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
 +
 +# 依存するオブジェクトファイルを集めて静的ライブラリを作る
@@ -108,6 +108,9 @@ index 0000000..99b70ce
 +    ar_path = cc_toolchain.ar_executable
 +
 +    if ctx.target_platform_has_constraint(windows_constraint):
++        # Bazel のデフォルトのカスタムコマンドでは WSL の Bash.exe を実行してしまうため、
++        # C ドライブが /mnt/c にマウントされていると仮定してパスを変換する
++        ar_path = ar_path.replace("C:", "/mnt/c")
 +        command = "\"{0}\" /OUT:{1} {2}".format(ar_path, output.path, " ".join(lib_paths))
 +    elif ctx.target_platform_has_constraint(macos_constraint):
 +        command = '"{0}" -static -o {1} {2}'.format('libtool', output.path, " ".join(lib_paths))
