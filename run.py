@@ -324,6 +324,9 @@ def _package(target: str, debug: bool):
             ],
             build_target=platform.build.package_name,
         )
+        # NOTICE, LICENSE, DEPS, VERSION のコピー
+        for filename in ("NOTICE", "LICENSE", "DEPS", "VERSION"):
+            install_file(os.path.join(BASE_DIR, filename), os.path.join(moqt_package_dir, filename))
 
 
 def _test(target: str, debug: bool):
