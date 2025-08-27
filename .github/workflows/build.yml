@@ -27,7 +27,7 @@ jobs:
       - name: Create Archive
         run: |
           cd _package/${{ matrix.target }}/release
-          tar czvf moqt.tar.gz -C . moqt
+          tar czvf moqt-${{ matrix.target }}.tar.gz -C . moqt
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
