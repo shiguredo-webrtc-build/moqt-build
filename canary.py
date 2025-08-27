@@ -61,9 +61,7 @@ def git_operations(new_version: str, dry_run: bool) -> None:
 
 # メイン処理
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Update VERSION file, run uv sync, and commit changes."
-    )
+    parser = argparse.ArgumentParser(description="Update VERSION file and commit changes.")
     parser.add_argument(
         "--dry-run", action="store_true", help="Run in dry-run mode without making actual changes"
     )
