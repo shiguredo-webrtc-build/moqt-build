@@ -12,7 +12,7 @@ Please read <https://github.com/shiguredo/oss/blob/master/README.en.md> before u
 
 ## moqt-build について
 
-様々な環境向けに Google の [quiche/moqt](https://github.com/google/quiche) のビルドを行って、そのバイナリを提供しています。
+様々な環境向けに Google の [quiche/moqt](https://github.com/google/quiche/tree/main/quiche/quic/moqt) のビルドを行って、そのバイナリを提供しています。
 
 ## ダウンロード
 
