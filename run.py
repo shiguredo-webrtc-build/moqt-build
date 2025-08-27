@@ -1,49 +1,23 @@
 import argparse
 import glob
-import hashlib
-import json
 import logging
-import multiprocessing
 import os
 import shutil
-import tarfile
-import zipfile
-from typing import Dict, List, Optional
 
 from buildbase import (
     Platform,
-    WebrtcInfo,
     add_path,
-    add_webrtc_build_arguments,
     apply_patch,
-    build_and_install_boost,
-    build_webrtc,
     cd,
     cmake_path,
     cmd,
     cmdcap,
-    enum_all_files,
-    fix_clang_version,
-    get_clang_version,
     get_macos_osver,
-    get_webrtc_info,
-    get_webrtc_platform,
     get_windows_osver,
     git_clone_shallow,
-    install_amf,
-    install_android_ndk,
-    install_android_sdk_cmdline_tools,
-    install_blend2d_official,
-    install_catch2,
-    install_cmake,
-    install_cuda_windows,
-    install_llvm,
-    install_openh264,
-    install_rootfs,
-    install_vpl,
-    install_vswhere,
-    install_webrtc,
     install_bazelisk,
+    install_cmake,
+    install_vswhere,
     mkdir_p,
     read_version_file,
     rm_rf,
@@ -110,7 +84,12 @@ def install_deps(
         bazelisk_platform = "linux-arm64"
     else:
         raise Exception(f"Unsupported platform for bazelisk: {platform.build.package_name}")
-    install_bazelisk(version=deps["BAZELISK_VERSION"], version_file=os.path.join(install_dir, "bazelisk.version"), install_dir=install_dir, platform=bazelisk_platform)
+    install_bazelisk(
+        version=deps["BAZELISK_VERSION"],
+        version_file=os.path.join(install_dir, "bazelisk.version"),
+        install_dir=install_dir,
+        platform=bazelisk_platform,
+    )
     add_path(os.path.join(install_dir, "bazelisk"))
 
     # CMake
@@ -142,7 +121,11 @@ def install_deps(
 
     # VSWhere
     if platform.build.os == "windows":
-        install_vswhere(version=deps["VSWHERE_VERSION"], version_file=os.path.join(install_dir, "vswhere.version"), install_dir=install_dir)
+        install_vswhere(
+            version=deps["VSWHERE_VERSION"],
+            version_file=os.path.join(install_dir, "vswhere.version"),
+            install_dir=install_dir,
+        )
 
 
 def rsync(src_dir, dst_dir, includes: list[str], build_target):
@@ -242,9 +225,12 @@ def _build(
     quiche_source_dir = os.path.join(source_dir, "quiche")
     if not os.path.exists(quiche_source_dir):
         logging.info("Cloning quiche...")
-        git_clone_shallow(url="https://quiche.googlesource.com/quiche", hash=deps["QUICHE_VERSION"], dir=quiche_source_dir)
+        git_clone_shallow(
+            url="https://quiche.googlesource.com/quiche",
+            hash=deps["QUICHE_VERSION"],
+            dir=quiche_source_dir,
+        )
         apply_patch(os.path.join(BASE_DIR, "quiche.patch"), quiche_source_dir, 1)
-
 
     with cd(quiche_source_dir):
         bazel_args = []
@@ -262,7 +248,18 @@ def _build(
             # に従って BAZEL_LLVM 環境変数を設定し、clang-cl 用の toolchain を指定する
 
             vswhere = os.path.join(install_dir, "vswhere", "vswhere.exe")
-            msvc_path = cmdcap([vswhere, "-latest", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Llvm.Clang", "-property", "installationPath"])
+            msvc_path = cmdcap(
+                [
+                    vswhere,
+                    "-latest",
+                    "-products",
+                    "*",
+                    "-requires",
+                    "Microsoft.VisualStudio.Component.VC.Llvm.Clang",
+                    "-property",
+                    "installationPath",
+                ]
+            )
             logging.info(f"MSVC Installed Path: {msvc_path}")
             os.environ["BAZEL_LLVM"] = os.path.join(msvc_path, "VC", "Tools", "Llvm", "x64")
             bazel_args += [
@@ -300,7 +297,10 @@ def _package(target: str, debug: bool):
         moqt_package_dir = os.path.join(package_dir, "moqt")
         # ライブラリのコピー
         libname = "moqt.lib" if platform.build.os == "windows" else "libmoqt.a"
-        install_file(os.path.join(quiche_source_dir, "bazel-bin", "quiche", libname), os.path.join(moqt_package_dir, "lib", libname))
+        install_file(
+            os.path.join(quiche_source_dir, "bazel-bin", "quiche", libname),
+            os.path.join(moqt_package_dir, "lib", libname),
+        )
         # quiche のヘッダのコピー
         rsync(
             src_dir=os.path.join(quiche_source_dir, "quiche"),
@@ -311,7 +311,9 @@ def _package(target: str, debug: bool):
             build_target=platform.build.package_name,
         )
         # abseil のヘッダのコピー
-        abseil_dirs = glob.glob(os.path.join(quiche_source_dir, "bazel-quiche", "external", "abseil-cpp*"))
+        abseil_dirs = glob.glob(
+            os.path.join(quiche_source_dir, "bazel-quiche", "external", "abseil-cpp*")
+        )
         if len(abseil_dirs) != 1:
             raise Exception("abseil-cpp not found")
         abseil_dir = abseil_dirs[0]
@@ -352,7 +354,16 @@ def _test(target: str, debug: bool):
     ]
     if platform.build.os == "windows":
         args += ["-T", "ClangCL"]
-    cmd(["cmake", "-B", os.path.join(build_dir, "test"), "-S", os.path.join(BASE_DIR, "test"), *args])
+    cmd(
+        [
+            "cmake",
+            "-B",
+            os.path.join(build_dir, "test"),
+            "-S",
+            os.path.join(BASE_DIR, "test"),
+            *args,
+        ]
+    )
     cmd(["cmake", "--build", os.path.join(build_dir, "test"), "--config", cmake_configuration])
     if platform.build.os == "windows":
         cmd([os.path.join(build_dir, "test", cmake_configuration, "moqt_test.exe")])
@@ -379,7 +390,7 @@ def _clean(target: str, debug: bool):
 
 def main():
     parser = argparse.ArgumentParser()
-    subparser = parser.add_subparsers(dest="command",  help="利用可能なコマンド", required=True)
+    subparser = parser.add_subparsers(dest="command", help="利用可能なコマンド", required=True)
     bp = subparser.add_parser("build")
     bp.add_argument("target", choices=AVAILABLE_TARGETS)
     bp.add_argument("--debug", action="store_true")
