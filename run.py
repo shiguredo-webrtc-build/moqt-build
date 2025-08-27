@@ -41,6 +41,7 @@ from buildbase import (
     install_openh264,
     install_rootfs,
     install_vpl,
+    install_vswhere,
     install_webrtc,
     install_bazelisk,
     mkdir_p,
@@ -96,6 +97,7 @@ def install_deps(
     with cd(BASE_DIR):
         deps = read_version_file("DEPS")
 
+    # Bazelisk
     if platform.build.package_name == "windows_x86_64":
         bazelisk_platform = "windows-amd64"
     elif platform.build.package_name == "windows_arm64":
@@ -108,9 +110,39 @@ def install_deps(
         bazelisk_platform = "linux-arm64"
     else:
         raise Exception(f"Unsupported platform for bazelisk: {platform.build.package_name}")
-
     install_bazelisk(version=deps["BAZELISK_VERSION"], version_file=os.path.join(install_dir, "bazelisk.version"), install_dir=install_dir, platform=bazelisk_platform)
     add_path(os.path.join(install_dir, "bazelisk"))
+
+    # CMake
+    install_cmake_args = {
+        "version": deps["CMAKE_VERSION"],
+        "version_file": os.path.join(install_dir, "cmake.version"),
+        "source_dir": source_dir,
+        "install_dir": install_dir,
+        "platform": "",
+        "ext": "tar.gz",
+    }
+    if platform.build.os == "windows" and platform.build.arch == "x86_64":
+        install_cmake_args["platform"] = "windows-x86_64"
+        install_cmake_args["ext"] = "zip"
+    elif platform.build.os == "macos":
+        install_cmake_args["platform"] = "macos-universal"
+    elif platform.build.os == "ubuntu" and platform.build.arch == "x86_64":
+        install_cmake_args["platform"] = "linux-x86_64"
+    elif platform.build.os == "ubuntu" and platform.build.arch == "arm64":
+        install_cmake_args["platform"] = "linux-aarch64"
+    else:
+        raise Exception("Failed to install CMake")
+    install_cmake(**install_cmake_args)
+
+    if platform.build.os == "macos":
+        add_path(os.path.join(install_dir, "cmake", "CMake.app", "Contents", "bin"))
+    else:
+        add_path(os.path.join(install_dir, "cmake", "bin"))
+
+    # VSWhere
+    if platform.build.os == "windows":
+        install_vswhere(version=deps["VSWHERE_VERSION"], version_file=os.path.join(install_dir, "vswhere.version"), install_dir=install_dir)
 
 
 def rsync(src_dir, dst_dir, includes: list[str], build_target):
@@ -215,9 +247,48 @@ def _build(
 
 
     with cd(quiche_source_dir):
+        bazel_args = []
+        # Windows では .bazelrc を無視する
+        if platform.build.package_name in ("windows_x86_64", "windows_arm64"):
+            bazel_args += ["--noworkspace_rc"]
+        bazel_args += ["build", "quiche:moqt"]
         if not debug:
-            bazel_args = ["-c", "opt"]
-        cmd(["bazelisk", "build", "quiche:moqt", *bazel_args])
+            bazel_args += ["-c", "opt"]
+        if platform.build.package_name in ("windows_x86_64", "windows_arm64"):
+            # quiche が依存している protobuf や googleurl などのライブラリが MSVC に対応していないので
+            # clang-cl を使うようにする
+            #
+            # https://bazel.build/configure/windows
+            # に従って BAZEL_LLVM 環境変数を設定し、clang-cl 用の toolchain を指定する
+
+            vswhere = os.path.join(install_dir, "vswhere", "vswhere.exe")
+            msvc_path = cmdcap([vswhere, "-latest", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Llvm.Clang", "-property", "installationPath"])
+            logging.info(f"MSVC Installed Path: {msvc_path}")
+            os.environ["BAZEL_LLVM"] = os.path.join(msvc_path, "VC", "Tools", "Llvm", "x64")
+            bazel_args += [
+                "--extra_toolchains=@local_config_cc//:cc-toolchain-x64_windows-clang-cl",
+                "--extra_execution_platforms=//:x64_windows-clang-cl",
+                # quiche の .bazelrc で定義されているものと同等のオプションを指定する
+                "--cxxopt=/std:c++20",
+                "--host_cxxopt=/std:c++20",
+                "--cxxopt=/GR-",
+                "--host_cxxopt=/GR-",
+                "--define=absl=1",
+                # Linux 以外では system_icu を使わないようにする
+                "--@com_google_googleurl//build_config:system_icu=0",
+                # googleurl がちゃんと include してないせいで Windows のビルドが通らないので強制的に include する
+                "--cxxopt=/FIstring",
+                "--host_cxxopt=/FIstring",
+                "--cxxopt=/FIostream",
+                "--host_cxxopt=/FIostream",
+                # X509_NAME とかのいらないマクロが定義されてビルドが通らないので、WIN32_LEAN_AND_MEAN で不要なヘッダーを除外する
+                "--cxxopt=/DWIN32_LEAN_AND_MEAN",
+                # wingdi.h の ERROR マクロのせいでビルドが通らないので NOGDI を定義して除外する
+                "--cxxopt=/DNOGDI",
+                "-s",
+            ]
+
+        cmd(["bazelisk", *bazel_args])
 
 
 def _package(target: str, debug: bool):
@@ -229,7 +300,8 @@ def _package(target: str, debug: bool):
     with cd(quiche_source_dir):
         moqt_package_dir = os.path.join(package_dir, "moqt")
         # ライブラリのコピー
-        install_file(os.path.join(quiche_source_dir, "bazel-bin", "quiche", "libmoqt.a"), os.path.join(moqt_package_dir, "lib", "libmoqt.a"))
+        libname = "moqt.lib" if platform.build.os == "windows" else "libmoqt.a"
+        install_file(os.path.join(quiche_source_dir, "bazel-bin", "quiche", libname), os.path.join(moqt_package_dir, "lib", libname))
         # quiche のヘッダのコピー
         rsync(
             src_dir=os.path.join(quiche_source_dir, "quiche"),
@@ -259,16 +331,48 @@ def _test(target: str, debug: bool):
     platform = _get_platform(target)
     configuration = "debug" if debug else "release"
     cmake_configuration = "Debug" if debug else "Release"
+    source_dir = os.path.join(BASE_DIR, "_source", platform.target.package_name, configuration)
     build_dir = os.path.join(BASE_DIR, "_build", platform.target.package_name, configuration)
+    install_dir = os.path.join(BASE_DIR, "_install", platform.target.package_name, configuration)
     package_dir = os.path.join(BASE_DIR, "_package", platform.target.package_name, configuration)
+
+    install_deps(
+        platform,
+        source_dir,
+        build_dir,
+        install_dir,
+        debug,
+    )
+
     args = [
         f"-DCMAKE_BUILD_TYPE={cmake_configuration}",
         f"-DMOQT_ROOT={cmake_path(os.path.join(package_dir, 'moqt'))}",
     ]
+    if platform.build.os == "windows":
+        args += ["-T", "ClangCL"]
     cmd(["cmake", "-B", os.path.join(build_dir, "test"), "-S", os.path.join(BASE_DIR, "test"), *args])
     cmd(["cmake", "--build", os.path.join(build_dir, "test"), "--config", cmake_configuration])
-    ext = ".exe" if platform.build.os == "windows" else ""
-    cmd([os.path.join(build_dir, "test", f"moqt_test{ext}")])
+    if platform.build.os == "windows":
+        cmd([os.path.join(build_dir, "test", cmake_configuration, "moqt_test")])
+    else:
+        cmd([os.path.join(build_dir, "test", "moqt_test")])
+
+
+def _clean(target: str, debug: bool):
+    platform = _get_platform(target)
+    configuration = "debug" if debug else "release"
+    source_dir = os.path.join(BASE_DIR, "_source", platform.target.package_name, configuration)
+    build_dir = os.path.join(BASE_DIR, "_build", platform.target.package_name, configuration)
+    install_dir = os.path.join(BASE_DIR, "_install", platform.target.package_name, configuration)
+    package_dir = os.path.join(BASE_DIR, "_package", platform.target.package_name, configuration)
+    add_path(os.path.join(install_dir, "bazelisk"))
+    if os.path.exists(os.path.join(source_dir, "quiche")):
+        with cd(os.path.join(source_dir, "quiche")):
+            cmd(["bazelisk", "clean", "--expunge"], check=False)
+    rm_rf(source_dir)
+    rm_rf(build_dir)
+    rm_rf(install_dir)
+    rm_rf(package_dir)
 
 
 def main():
@@ -283,6 +387,9 @@ def main():
     tp = subparser.add_parser("test")
     tp.add_argument("target", choices=AVAILABLE_TARGETS)
     tp.add_argument("--debug", action="store_true")
+    cp = subparser.add_parser("clean")
+    cp.add_argument("target", choices=AVAILABLE_TARGETS)
+    cp.add_argument("--debug", action="store_true")
 
     args = parser.parse_args()
 
@@ -298,6 +405,11 @@ def main():
         )
     elif args.command == "test":
         _test(
+            target=args.target,
+            debug=args.debug,
+        )
+    elif args.command == "clean":
+        _clean(
             target=args.target,
             debug=args.debug,
         )
