@@ -19,12 +19,16 @@ diff --git a/MODULE.bazel b/MODULE.bazel
 index f535b6d..5e59023 100644
 --- a/MODULE.bazel
 +++ b/MODULE.bazel
-@@ -49,3 +49,5 @@ http_archive(
+@@ -49,3 +49,9 @@ http_archive(
      sha256 = "1d2c507cc31e109ecb41ba1fe766f5ff0f5974c3ba8d0919b3d22668f7e89305",  # Last updated 2023-07-06
      urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl-5573f9aa120f3fbd378ca1b2565bbf7d223cd542.tar.gz"],
  )
 +
 +bazel_dep(name = "platforms", version = "1.0.0", dev_dependency = True)
++
++# For clang-cl configuration
++cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
++use_repo(cc_configure, "local_config_cc")
 diff --git a/quiche/BUILD.bazel b/quiche/BUILD.bazel
 index 5303107..8053fe6 100644
 --- a/quiche/BUILD.bazel

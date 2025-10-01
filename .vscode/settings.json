@@ -11,4 +11,7 @@
       "source.organizeImports.ruff": "explicit"
     }
   },
+  "files.associations": {
+    "DEPS": "shellscript",
+  },
 }
