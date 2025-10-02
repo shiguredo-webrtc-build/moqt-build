@@ -18,6 +18,14 @@ Please read <https://github.com/shiguredo/oss/blob/master/README.en.md> before u
 
 [リリース](https://github.com/shiguredo-webrtc-build/moqt-build/releases) からダウンロードしてください。
 
+## タグ
+
+- YYYY.MM.UPDATE
+  - 例: 2024.09.0
+- 定期的にリリースします。
+- 2025.09.0 の場合 2025 年 9 月末までの quiche の更新が含まれます。
+- UPDATE は quiche の更新はしないが、ビルド設定の変更などがあった場合に更新します。
+
 ## 現在提供しているビルド
 
 - windows_x86_64
